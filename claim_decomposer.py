@@ -55,6 +55,30 @@ class BackstoryClaimDecomposer:
         
         print(f"Loading model (quantization={use_quantization}, device={self.device})...")
         start_time = time.time()
+        
+        # Fix rope_scaling config issue for LLaMA-3.1
+        from transformers import AutoConfig
+        config_kwargs = {}
+        if self.hf_token:
+            config_kwargs["token"] = self.hf_token
+        try:
+            config = AutoConfig.from_pretrained(model_name, **config_kwargs)
+            # Fix rope_scaling if it exists and has wrong format
+            if hasattr(config, 'rope_scaling') and config.rope_scaling is not None:
+                if isinstance(config.rope_scaling, dict):
+                    # Check if it's the new format that needs conversion
+                    if 'rope_type' in config.rope_scaling:
+                        # Convert to expected format
+                        rope_type = config.rope_scaling.get('rope_type', 'default')
+                        factor = config.rope_scaling.get('factor', 1.0)
+                        config.rope_scaling = {
+                            'type': rope_type,
+                            'factor': factor
+                        }
+        except Exception as e:
+            print(f"  Warning: Could not fix rope_scaling config: {e}")
+            config = None
+        
         # Load model with quantization if requested
         if use_quantization and self.device == "cuda":
             quantization_config = BitsAndBytesConfig(
@@ -70,6 +94,9 @@ class BackstoryClaimDecomposer:
             }
             if self.hf_token:
                 model_kwargs["token"] = self.hf_token
+            if config is not None:
+                model_kwargs["config"] = config
+            model_kwargs["progress"] = True
             self.model = AutoModelForCausalLM.from_pretrained(model_name, **model_kwargs)
         else:
             model_kwargs = {
@@ -78,6 +105,8 @@ class BackstoryClaimDecomposer:
             }
             if self.hf_token:
                 model_kwargs["token"] = self.hf_token
+            if config is not None:
+                model_kwargs["config"] = config
             model_kwargs["progress"] = True  # Show download progress
             self.model = AutoModelForCausalLM.from_pretrained(model_name, **model_kwargs)
         
