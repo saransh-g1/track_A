@@ -180,14 +180,20 @@ class LLMReasoningEngine:
         self.device = device if torch.cuda.is_available() else "cpu"
         self.hf_token = hf_token or os.getenv("HF_TOKEN")
         
+        print(f"  Loading tokenizer for {model_name}...")
+        start_time = time.time()
         # Load tokenizer
         tokenizer_kwargs = {}
         if self.hf_token:
             tokenizer_kwargs["token"] = self.hf_token
+        tokenizer_kwargs["progress"] = True
         self.tokenizer = AutoTokenizer.from_pretrained(model_name, **tokenizer_kwargs)
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
+        print(f"  ✓ Tokenizer loaded in {time.time() - start_time:.2f}s")
         
+        print(f"  Loading model (quantization={use_quantization}, device={self.device})...")
+        start_time = time.time()
         # Load model (reuse from claim decomposer if available, or load separately)
         if use_quantization and self.device == "cuda":
             from transformers import BitsAndBytesConfig
@@ -204,6 +210,7 @@ class LLMReasoningEngine:
             }
             if self.hf_token:
                 model_kwargs["token"] = self.hf_token
+            model_kwargs["progress"] = True
             self.model = AutoModelForCausalLM.from_pretrained(model_name, **model_kwargs)
         else:
             model_kwargs = {
@@ -212,9 +219,11 @@ class LLMReasoningEngine:
             }
             if self.hf_token:
                 model_kwargs["token"] = self.hf_token
+            model_kwargs["progress"] = True
             self.model = AutoModelForCausalLM.from_pretrained(model_name, **model_kwargs)
         
         self.model.eval()
+        print(f"  ✓ Model loaded in {time.time() - start_time:.2f}s")
     
     def verify_claim(
         self,
@@ -299,6 +308,7 @@ Return only valid JSON:"""
             max_length=4096
         ).to(self.device)
         
+        # Show progress during generation
         with torch.no_grad():
             outputs = self.model.generate(
                 **inputs,

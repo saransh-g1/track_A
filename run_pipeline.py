@@ -146,9 +146,12 @@ class TrackAPipeline:
         print("Retrieving evidence for each claim...")
         
         claim_verifications = []
-        for idx, claim in enumerate(claims, 1):
-            print(f"  Processing claim {idx}/{len(claims)}: {claim.claim_text[:60]}...")
-            
+        from tqdm import tqdm
+        import time
+        
+        # Process claims with progress bar
+        print(f"\n  Processing {len(claims)} claims...")
+        for idx, claim in enumerate(tqdm(claims, desc="  Claims", unit="claim"), 1):
             # Retrieve evidence
             evidence_results = self.document_store.retrieve_evidence(
                 query=claim.claim_text,
@@ -168,10 +171,7 @@ class TrackAPipeline:
                 for chunk, score in evidence_results
             ]
             
-            print(f"    Retrieved {len(evidence_chunks)} evidence chunks")
-            
             # Step 5: Hybrid Reasoning
-            print(f"    Verifying claim with hybrid reasoning...")
             verification = self.reasoning_layer.verify_claim(
                 claim=claim,
                 evidence_chunks=evidence_chunks,
@@ -180,8 +180,9 @@ class TrackAPipeline:
             
             claim_verifications.append(verification)
             
-            status = "✓ SATISFIED" if verification.is_satisfied else "✗ VIOLATED"
-            print(f"    {status} (confidence: {verification.confidence:.2f})")
+            # Update progress bar description
+            status = "✓" if verification.is_satisfied else "✗"
+            tqdm.write(f"    [{idx}/{len(claims)}] {status} {claim.claim_text[:50]}... (conf: {verification.confidence:.2f})")
         
         # Step 6: Global Consistency Aggregation
         print("\n[Step 6/6] Global Consistency Aggregator")

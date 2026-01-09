@@ -8,6 +8,8 @@ import torch
 from dataclasses import dataclass
 import json
 import os
+from tqdm import tqdm
+import time
 
 
 @dataclass
@@ -36,14 +38,23 @@ class BackstoryClaimDecomposer:
         self.device = device if torch.cuda.is_available() else "cpu"
         self.hf_token = hf_token or os.getenv("HF_TOKEN")
         
+        print(f"Loading tokenizer for {model_name}...")
+        start_time = time.time()
         # Load tokenizer
         tokenizer_kwargs = {}
         if self.hf_token:
             tokenizer_kwargs["token"] = self.hf_token
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name, **tokenizer_kwargs)
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            model_name, 
+            **tokenizer_kwargs,
+            progress=True  # Show download progress
+        )
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
+        print(f"✓ Tokenizer loaded in {time.time() - start_time:.2f}s")
         
+        print(f"Loading model (quantization={use_quantization}, device={self.device})...")
+        start_time = time.time()
         # Load model with quantization if requested
         if use_quantization and self.device == "cuda":
             quantization_config = BitsAndBytesConfig(
@@ -67,9 +78,11 @@ class BackstoryClaimDecomposer:
             }
             if self.hf_token:
                 model_kwargs["token"] = self.hf_token
+            model_kwargs["progress"] = True  # Show download progress
             self.model = AutoModelForCausalLM.from_pretrained(model_name, **model_kwargs)
         
         self.model.eval()
+        print(f"✓ Model loaded in {time.time() - start_time:.2f}s")
     
     def decompose(
         self,
@@ -86,13 +99,19 @@ class BackstoryClaimDecomposer:
         Returns:
             List of AtomicClaim objects
         """
+        print(f"  Creating decomposition prompt...")
         prompt = self._create_decomposition_prompt(backstory, max_claims)
         
         # Generate claims using LLM
+        print(f"  Generating claims with LLaMA-3.1-8B (this may take 30-60s)...")
+        start_time = time.time()
         claims_text = self._generate_claims(prompt)
+        print(f"  ✓ Generation completed in {time.time() - start_time:.2f}s")
         
         # Parse claims from LLM output
+        print(f"  Parsing claims from model output...")
         claims = self._parse_claims(claims_text, backstory)
+        print(f"  ✓ Parsed {len(claims)} claims")
         
         return claims[:max_claims]
     
@@ -150,6 +169,8 @@ Return only valid JSON:"""
             max_length=4096
         ).to(self.device)
         
+        # Show progress during generation
+        print(f"    Generating tokens (max 2048 tokens)...", end="", flush=True)
         with torch.no_grad():
             outputs = self.model.generate(
                 **inputs,
@@ -159,6 +180,7 @@ Return only valid JSON:"""
                 top_p=0.9,
                 pad_token_id=self.tokenizer.eos_token_id
             )
+        print(f" ✓")
         
         # Decode only the generated part
         generated_text = self.tokenizer.decode(

@@ -26,9 +26,10 @@ source venv/bin/activate
 echo "Upgrading pip..."
 pip install --upgrade pip
 
-# Install dependencies
-echo "Installing dependencies..."
-pip install -r requirements.txt
+# Install dependencies with progress
+echo "Installing dependencies (this may take 5-10 minutes)..."
+echo "Using optimized requirements (reduced from ~8GB to ~3GB)"
+pip install --progress-bar on -r requirements.txt
 
 # Download NLTK data
 echo "Downloading NLTK data..."

@@ -10,6 +10,8 @@ from sentence_transformers import SentenceTransformer
 import faiss
 from pathlib import Path
 import json
+from tqdm import tqdm
+import time
 
 
 @dataclass
@@ -106,6 +108,7 @@ class TemporalChunker:
         try:
             nltk.data.find('tokenizers/punkt')
         except LookupError:
+            print("  Downloading NLTK punkt tokenizer (one-time)...")
             nltk.download('punkt', quiet=True)
         
         from nltk.tokenize import sent_tokenize
@@ -180,9 +183,12 @@ class PathwayVectorStore:
         embedding_model_name: str = "sentence-transformers/all-MiniLM-L6-v2",
         store_path: Optional[str] = None
     ):
+        print(f"  Loading embedding model: {embedding_model_name}...")
+        start_time = time.time()
         self.embedding_model = SentenceTransformer(embedding_model_name)
         self.store_path = Path(store_path) if store_path else None
         self.dimension = self.embedding_model.get_sentence_embedding_dimension()
+        print(f"  ✓ Embedding model loaded in {time.time() - start_time:.2f}s (dim={self.dimension})")
         
         # FAISS index
         self.index = faiss.IndexFlatL2(self.dimension)
@@ -198,11 +204,13 @@ class PathwayVectorStore:
         """
         texts = [chunk.text for chunk in chunks]
         
-        # Generate embeddings
+        # Generate embeddings with progress bar
+        print(f"  Generating embeddings for {len(chunks)} chunks...")
         embeddings = self.embedding_model.encode(
             texts,
             show_progress_bar=True,
-            convert_to_numpy=True
+            convert_to_numpy=True,
+            batch_size=32  # Process in batches for better progress tracking
         )
         
         # Add to FAISS index
@@ -430,15 +438,19 @@ class PathwayDocumentStore:
             document_id: Unique document identifier
             chapter_id: Optional chapter identifier
         """
+        print(f"  Chunking document ({len(text):,} characters)...")
+        start_time = time.time()
         # Chunk with sentence boundaries
         chunks = self.chunker.chunk_with_sentences(
             text,
             document_id,
             chapter_id
         )
+        print(f"  ✓ Created {len(chunks)} chunks in {time.time() - start_time:.2f}s")
         
         # Add to vector store
         self.vector_store.add_chunks(chunks)
+        print(f"  ✓ Indexed {len(chunks)} chunks in vector store")
         
         return len(chunks)
     
