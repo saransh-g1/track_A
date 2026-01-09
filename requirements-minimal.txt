@@ -1,0 +1,12 @@
+# Minimal requirements for testing (without heavy ML dependencies)
+# Use this if you just want to test the pipeline structure
+
+pathway>=0.7.0
+numpy>=1.24.0
+tqdm>=4.66.0
+nltk>=3.8.0
+python-dotenv>=1.0.0
+
+# Note: This is for structure testing only
+# Full functionality requires requirements.txt
+

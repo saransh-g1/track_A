@@ -10,7 +10,6 @@ ENV/
 
 # Data files
 data/
-*.txt
 *.json
 !requirements.txt
 
