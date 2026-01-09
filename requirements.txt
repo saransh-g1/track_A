@@ -1,0 +1,29 @@
+# Track A - End-to-End RAG + Reasoning Pipeline Requirements
+
+# Core Framework (Mandatory)
+pathway>=0.7.0
+
+# LLM and Embeddings
+transformers>=4.40.0
+torch>=2.0.0
+sentence-transformers>=2.3.0
+accelerate>=0.30.0
+bitsandbytes>=0.43.0  # For quantization
+
+# Vector Store and Retrieval
+faiss-cpu>=1.7.4  # or faiss-gpu if available
+chromadb>=0.4.0
+
+# NLP and Text Processing
+spacy>=3.7.0
+nltk>=3.8.0
+
+# Utilities
+numpy>=1.24.0
+pydantic>=2.0.0
+tqdm>=4.66.0
+python-dotenv>=1.0.0
+
+# Optional: For cross-encoder reranking
+sentence-transformers[all]>=2.3.0
+
