@@ -65,16 +65,11 @@ class BackstoryClaimDecomposer:
             config = AutoConfig.from_pretrained(model_name, **config_kwargs)
             # Fix rope_scaling if it exists and has wrong format
             if hasattr(config, 'rope_scaling') and config.rope_scaling is not None:
-                if isinstance(config.rope_scaling, dict):
-                    # Check if it's the new format that needs conversion
-                    if 'rope_type' in config.rope_scaling:
-                        # Convert to expected format
-                        rope_type = config.rope_scaling.get('rope_type', 'default')
-                        factor = config.rope_scaling.get('factor', 1.0)
-                        config.rope_scaling = {
-                            'type': rope_type,
-                            'factor': factor
-                        }
+                # Force HF-compatible RoPE
+                config.rope_scaling = {
+                    "type": "dynamic",
+                    "factor": 8.0
+                }
         except Exception as e:
             print(f"  Warning: Could not fix rope_scaling config: {e}")
             config = None
